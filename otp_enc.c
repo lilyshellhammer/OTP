@@ -23,8 +23,8 @@ struct cipher{
 *****************************************************************/
 void saveCipherInfo(char** argv, struct cipher *c){
 	int file_descriptor_text, file_descriptor_key, nread;
-	char readBuffer[256];
-	char buffer[256];
+	char readBuffer[10000];
+	char buffer[10000];
 
 	/****GET TEXT*/
 	file_descriptor_text = open(argv[1], O_RDONLY);
@@ -73,13 +73,11 @@ void sendTextKey(int socketFD, struct cipher *c){
 	if (charsWritten < strlen(c->text)) printf("ENC: WARNING: Not all data written to socket!\n");
 	
 	//interim, "check" from server
-	char readBuffer[256];
+	char readBuffer[1000];
 	memset(readBuffer, '\0', sizeof(readBuffer));
 	charsRead = recv(socketFD, readBuffer, sizeof(readBuffer) - 1, 0);
 	if (charsRead < 0) 
 		error("ERROR reading from socket");
-	if(readBuffer[0] == '0')
-		printf("moving on\n");
 
 	//SEND KEY
 	charsWritten = send(socketFD, c->key, strlen(c->key), 0); // Write KEY to the server
@@ -90,7 +88,7 @@ void sendTextKey(int socketFD, struct cipher *c){
 	memset(readBuffer, '\0', sizeof(readBuffer)); // Clear out the buffer again for reuse
 	charsRead = recv(socketFD, readBuffer, sizeof(readBuffer) - 1, 0); // Read data from the socket, leaving \0 at end
 	if (charsRead < 0) error("ENC: ERROR reading from socket");
-	printf("Recieved from daemon: \"%s\"\n", readBuffer);
+	/*printf("Recieved from daemon: \"%s\"\n", readBuffer);*/
 }
 
 
@@ -119,8 +117,10 @@ void beginConnect(int argc, char** argv, int* socketFD){
 	if (*socketFD < 0) error("ENC: ERROR opening socket");
 
 	// Connect to server
-	if (connect(*socketFD, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) < 0) // Connect socket to addy
-	error("ENC: ERROR connecting");
+	if (connect(*socketFD, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) < 0){ // Connect socket to addy
+		printf("Error: could not contact otp_enc_d on port %s", argv[3]);
+		exit(2);
+	}
 
 }
 

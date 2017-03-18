@@ -23,8 +23,8 @@ struct cipher{
 *****************************************************************/
 void saveCipherInfo(char** argv, struct cipher *c){
 	int file_descriptor_code, file_descriptor_key, nread;
-	char readBuffer[256];
-	char buffer[256];
+	char readBuffer[1000];
+	char buffer[1000];
 
 	/****GET TEXT*/
 	file_descriptor_code = open(argv[1], O_RDONLY);
@@ -72,13 +72,11 @@ void sendCodeKey(int socketFD, struct cipher *c){
 	if (charsWritten < strlen(c->code)) printf("ENC: WARNING: Not all CODE data written to socket!\n");
 	
 	//interim, "check" from server
-	char readBuffer[256];
+	char readBuffer[10000];
 	memset(readBuffer, '\0', sizeof(readBuffer));
 	charsRead = recv(socketFD, readBuffer, sizeof(readBuffer) - 1, 0);
 	if (charsRead < 0) 
 		error("ERROR reading from socket");
-	if(readBuffer[0] == '0')
-		printf("moving on\n");
 
 	//SEND KEY
 	charsWritten = send(socketFD, c->key, strlen(c->key), 0); // Write KEY to the server
@@ -89,7 +87,7 @@ void sendCodeKey(int socketFD, struct cipher *c){
 	memset(readBuffer, '\0', sizeof(readBuffer)); // Clear out the buffer again for reuse
 	charsRead = recv(socketFD, readBuffer, sizeof(readBuffer) - 1, 0); // Read data from the socket, leaving \0 at end
 	if (charsRead < 0) error("DEC: ERROR reading from socket");
-	printf("Recieved from Dec daemon: \"%s\"\n", readBuffer);
+	/*printf("Recieved from Dec daemon: \"%s\"\n", readBuffer);*/
 }
 
 
@@ -118,8 +116,10 @@ void beginConnect(int argc, char** argv, int* socketFD){
 	if (*socketFD < 0) error("ENC: ERROR opening socket");
 
 	// Connect to server
-	if (connect(*socketFD, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) < 0) // Connect socket to addy
-	error("ENC: ERROR connecting");
+	if (connect(*socketFD, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) < 0){ // Connect socket to addy
+		printf("Error: could not contact otp_dec_d on port %s", argv[3]);
+		exit(2);
+	}
 }
 
 /*****************************************************************
@@ -130,7 +130,7 @@ void beginConnect(int argc, char** argv, int* socketFD){
 *****************************************************************/
 void readDecoded(int socketFD){
 	int charsRead;
-	char readBuffer[256];
+	char readBuffer[1000000];
 	memset(readBuffer, '\0', sizeof(readBuffer));
 	charsRead = recv(socketFD, readBuffer, sizeof(readBuffer) - 1, 0);
 	if (charsRead < 0) 

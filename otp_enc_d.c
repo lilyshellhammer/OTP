@@ -19,19 +19,38 @@ struct cipher{
 * Input: 
 * Output: 
 *****************************************************************/
+void checkValid(struct cipher *c){
+	int i;
+	for(i = 0; i < strlen(c->text); i++){
+		if(c->text[i] > 'Z' || (c->text[i] < 'A' && c->text[i]!= ' ')){
+			printf("otp_enc_d error: input contains bad characters\n");
+			exit(1);
+		}
+	}
+}
+
+/*****************************************************************
+* Function name: 
+* Description: 
+* Input: 
+* Output: 
+*****************************************************************/
 void encode(struct cipher *c){
-	int i, math;
+	int i, j, math, letter, key;
 	c->code = malloc(strlen(c->text)*sizeof(char));
 	memset(c->code, '\0', sizeof(c->code));
+	char alpha[27] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ ";
 	for(i = 0; i < strlen(c->text); i++){
-		math = ((int)c->text[i] + (int)c->key[i]) % 27;
-		if(math == 26)
-			c->code[i] = ' ';
-		else
-			c->code[i] = (char)(math + 65);
+		for(j = 0; j < 27; j++){
+			if(c->text[i] == alpha[j])
+				letter = j;
+			if(c->text[i] == alpha[j])
+				key = j;
+		}
+		math = (letter + key) %27;
+		c->code[i] = alpha[math];
 	}
-	//printf("code is: %s\n", c->code);
-
+	printf("%s\n",c->code);
 }
 
 /*****************************************************************
@@ -42,11 +61,11 @@ void encode(struct cipher *c){
 *****************************************************************/
 void getTextKey(int establishedConnectionFD, struct cipher *c){
 	int charsWritten, charsRead;
-	char buffer[256];
+	char buffer[1000];
 
 	/*****FIRST GET PLAINTEXT*/
-	memset(buffer, '\0', 256);
-	charsRead = recv(establishedConnectionFD, buffer, 255, 0); // Read the client's message from the socket
+	memset(buffer, '\0', sizeof(buffer));
+	charsRead = recv(establishedConnectionFD, buffer, sizeof(buffer)-1, 0); // Read the client's message from the socket
 	if (charsRead < 0) 
 		error("ERROR reading from socket");
 	/*printf("ENC DEAMON: Recieved plaintext: \"%s\"\n", buffer);*/
@@ -60,8 +79,8 @@ void getTextKey(int establishedConnectionFD, struct cipher *c){
 	if (charsRead < 1) printf("ENC: WARNING: Not all data written to socket!\n");
 	
 	/******GET KEY*/
-	memset(buffer, '\0', 256);
-	charsRead = recv(establishedConnectionFD, buffer, 255, 0); // Read the client's message from the socket
+	memset(buffer, '\0', sizeof(buffer));
+	charsRead = recv(establishedConnectionFD, buffer, sizeof(buffer)-1, 0); // Read the client's message from the socket
 	if (charsRead < 0) 
 		error("ERROR reading from socket");
 	/*printf("ENC DEA: Received key: \"%s\"\n", buffer);*/
@@ -92,8 +111,9 @@ void spawning(struct cipher *c, int establishedConnectionFD){
 	}
 	else if (spawnPid == 0) /*SPAWN CODE*/
 	{
-		printf("SPAWN CODE\n");
+		//printf("SPAWN CODE\n");
 		/*DO ACTUAL ENCODING, SAVE VALUES*/
+		checkValid(c);
 		encode(c);
 		charsWritten = send(establishedConnectionFD, c->code, strlen(c->code), 0); // Write KEY to the server
 		if (charsWritten < 0) error("ENC: ERROR writing to socket");
@@ -169,6 +189,20 @@ void firstContact(int establishedConnectionFD){
 * Input: 
 * Output: 
 *****************************************************************/
+void checkLength(struct cipher *c){
+	if(strlen(c->key) < strlen(c->text)){
+		printf("ERROR: key shorter than message. Enter longer key\n");
+		exit(1);
+	}
+}
+
+
+/*****************************************************************
+* Function name: 
+* Description: 
+* Input: 
+* Output: 
+*****************************************************************/
 int main(int argc, char *argv[])
 {
 	int listenSocketFD, establishedConnectionFD;
@@ -176,6 +210,9 @@ int main(int argc, char *argv[])
 	struct sockaddr_in serverAddress, clientAddress;
 	/*START SOCKET TO BEGIN LISTENING*/
 	createSocketBegin(argc, argv, &listenSocketFD, &serverAddress, &clientAddress);
+	int i = 0;
+	do{
+		i++;
 	listen(listenSocketFD, 5); // Flip the socket on - it can now receive up to 5 connections
 	
 	// Accept a connection, blocking if one is not available until one connects
@@ -186,9 +223,11 @@ int main(int argc, char *argv[])
 	firstContact(establishedConnectionFD);
 	struct cipher c;
 	getTextKey(establishedConnectionFD, &c);
+	checkLength(&c);
 	
 	/*OK NOW WE HAVE CODE AND KEY*/
 	spawning(&c, establishedConnectionFD);
+	}while(i < 5);
 
 	close(establishedConnectionFD); // Close the existing socket which is connected to the client
 	close(listenSocketFD); // Close the listening socket
